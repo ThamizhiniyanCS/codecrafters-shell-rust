@@ -70,7 +70,7 @@ fn execute(env_var_path: &String, cmd: &str, args_string: Option<String>) {
 
         let stdout = String::from_utf8(output.stdout).expect("Invalid utf-8 in process output");
 
-        println!("{}", stdout);
+        println!("{}", stdout.trim());
     }
 }
 
