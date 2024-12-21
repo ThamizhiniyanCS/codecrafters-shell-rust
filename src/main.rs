@@ -56,7 +56,7 @@ fn execute(env_var_path: &String, cmd: &str, args_string: Option<String>) {
     let result: Option<String> = is_valid_executable_env_path(env_var_path, &cmd);
 
     if result.is_none() {
-        println!("{}: not found", cmd);
+        println!("{}: command not found", cmd);
     } else {
         let output = match args_string {
             Some(args) => Command::new(cmd)
