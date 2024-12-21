@@ -3,10 +3,6 @@ use regex::Regex;
 use std::io::{self, Write};
 use std::process::exit;
 
-fn command_not_found(command: &str) {
-    println!("{}: command not found", command);
-}
-
 fn main() {
     let commands: [&str; 3] = ["echo", "type", "exit"];
 
@@ -37,10 +33,10 @@ fn main() {
             if commands.contains(&command) {
                 println!("{} is a shell builtin", command);
             } else {
-                command_not_found(command);
+                println!("{}: not found", command);
             }
         } else {
-            command_not_found(&input);
+            println!("{}: command not found", input);
         }
     }
 }
