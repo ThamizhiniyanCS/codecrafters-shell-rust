@@ -1,11 +1,25 @@
 use regex::Regex;
+use std::env;
 #[allow(unused_imports)]
 use std::io::{self, Write};
+use std::path::Path;
 use std::process::exit;
+
+fn builtin_type(env_var_path: &String, command: &str) {
+    for p in env_var_path.split(":") {
+        let path_string = format!("{p}/{command}").to_string();
+        let path = Path::new(&path_string);
+
+        if path.is_file() {
+            println!("{command} is {path_string}");
+            break;
+        }
+    }
+}
 
 fn main() {
     let commands: [&str; 3] = ["echo", "type", "exit"];
-
+    let env_var_path = env::var("PATH").unwrap();
     let regex_echo_pattern: Regex = Regex::new(r"^echo\s(.+)$").unwrap();
     let regex_type_pattern: Regex = Regex::new(r"^type\s(.+)$").unwrap();
 
@@ -31,7 +45,7 @@ fn main() {
             let command: &str = type_capture.unwrap().get(1).unwrap().as_str();
 
             if commands.contains(&command) {
-                println!("{} is a shell builtin", command);
+                builtin_type(&env_var_path, command);
             } else {
                 println!("{}: not found", command);
             }
