@@ -46,8 +46,9 @@ fn main() {
             let command: &str = type_capture.unwrap().get(1).unwrap().as_str();
 
             if commands.contains(&command) {
-                let result: Option<String> = builtin_type(&env_var_path, command);
                 println!("{} is a shell builtin", command);
+            } else {
+                let result: Option<String> = builtin_type(&env_var_path, command);
 
                 if result.is_none() {
                     println!("{}: not found", command);
