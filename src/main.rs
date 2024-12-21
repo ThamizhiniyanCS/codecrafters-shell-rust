@@ -19,6 +19,7 @@ fn builtin_type(env_var_path: &String, command: &str) -> Option<String> {
 }
 
 fn main() {
+    let commands: [&str; 3] = ["echo", "type", "exit"];
     let env_var_path = env::var("PATH").unwrap();
     let regex_echo_pattern: Regex = Regex::new(r"^echo\s(.+)$").unwrap();
     let regex_type_pattern: Regex = Regex::new(r"^type\s(.+)$").unwrap();
@@ -44,12 +45,15 @@ fn main() {
         } else if !type_capture.is_none() {
             let command: &str = type_capture.unwrap().get(1).unwrap().as_str();
 
-            let result: Option<String> = builtin_type(&env_var_path, command);
+            if commands.contains(&command) {
+                let result: Option<String> = builtin_type(&env_var_path, command);
+                println!("{} is a shell builtin", command);
 
-            if result.is_none() {
-                println!("{}: not found", command);
-            } else {
-                println!("{command} is {}", result.unwrap());
+                if result.is_none() {
+                    println!("{}: not found", command);
+                } else {
+                    println!("{command} is {}", result.unwrap());
+                }
             }
         } else {
             println!("{}: command not found", input);
