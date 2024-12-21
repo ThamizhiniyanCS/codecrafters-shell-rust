@@ -11,7 +11,6 @@ fn builtin_type(env_var_path: &String, command: &str) -> Option<String> {
         let path = Path::new(&path_string);
 
         if path.is_file() {
-            println!("{command} is {path_string}");
             return Some(path_string);
         }
     }
@@ -20,7 +19,6 @@ fn builtin_type(env_var_path: &String, command: &str) -> Option<String> {
 }
 
 fn main() {
-    let commands: [&str; 3] = ["echo", "type", "exit"];
     let env_var_path = env::var("PATH").unwrap();
     let regex_echo_pattern: Regex = Regex::new(r"^echo\s(.+)$").unwrap();
     let regex_type_pattern: Regex = Regex::new(r"^type\s(.+)$").unwrap();
