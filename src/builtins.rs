@@ -5,17 +5,23 @@ use std::process::exit;
 
 pub fn _cd(args_string: Option<String>) {
     match args_string {
-        Some(args) => {
-            let path = Path::new(&args);
-
-            match path.is_dir() {
-                true => match path.is_absolute() {
-                    true => env::set_current_dir(path).unwrap(),
-                    false => env::set_current_dir(path.canonicalize().unwrap()).unwrap(),
-                },
-                false => println!("cd: {args}: No such file or directory"),
+        Some(args) => match args == "~" {
+            true => {
+                let home = env::var("HOME").unwrap();
+                env::set_current_dir(home).unwrap();
             }
-        }
+            false => {
+                let path = Path::new(&args);
+
+                match path.is_dir() {
+                    true => match path.is_absolute() {
+                        true => env::set_current_dir(path).unwrap(),
+                        false => env::set_current_dir(path.canonicalize().unwrap()).unwrap(),
+                    },
+                    false => println!("cd: {args}: No such file or directory"),
+                }
+            }
+        },
         None => println!("Expecting a valid path as argument."),
     }
 }
