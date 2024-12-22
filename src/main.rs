@@ -5,7 +5,7 @@ use std::process::Command;
 mod builtins;
 mod utils;
 
-fn execute(cmd: &str, args_string: Option<String>) {
+fn execute(cmd: &str, args_string: Option<Vec<String>>) {
     let result: Option<String> = utils::is_valid_executable_env_path(&cmd);
 
     if result.is_none() {
@@ -13,7 +13,7 @@ fn execute(cmd: &str, args_string: Option<String>) {
     } else {
         let output = match args_string {
             Some(args) => Command::new(cmd)
-                .args(args.split_whitespace())
+                .args(args)
                 .output()
                 .expect("Failed to execute process."),
             None => Command::new(cmd)
@@ -63,14 +63,19 @@ fn main() {
             };
         }
 
+        let processed_args: Option<Vec<String>> = match args_string {
+            Some(args_str) => Some(utils::process_args(&args_str)),
+            None => None,
+        };
+
         if !command.is_none() {
             match command.unwrap() {
-                "cd" => builtins::_cd(args_string),
-                "echo" => builtins::_echo(args_string),
-                "exit" => builtins::_exit(args_string),
+                "cd" => builtins::_cd(processed_args),
+                "echo" => builtins::_echo(processed_args),
+                "exit" => builtins::_exit(processed_args),
                 "pwd" => builtins::_pwd(),
-                "type" => builtins::_type(args_string),
-                _ => execute(command.unwrap(), args_string),
+                "type" => builtins::_type(processed_args),
+                _ => execute(command.unwrap(), processed_args),
             }
         }
     }
