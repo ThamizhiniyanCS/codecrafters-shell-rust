@@ -65,6 +65,7 @@ fn main() {
 
         if !command.is_none() {
             match command.unwrap() {
+                "cd" => builtins::_cd(args_string),
                 "echo" => builtins::_echo(args_string),
                 "exit" => builtins::_exit(args_string),
                 "pwd" => builtins::_pwd(),

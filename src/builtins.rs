@@ -1,6 +1,24 @@
 use crate::utils;
 use std::env;
+use std::path::Path;
 use std::process::exit;
+
+pub fn _cd(args_string: Option<String>) {
+    match args_string {
+        Some(args) => {
+            let path = Path::new(&args);
+
+            if path.is_dir() {
+                if path.is_absolute() {
+                    env::set_current_dir(path).unwrap();
+                }
+            } else {
+                println!("cd: {args}: No such file or directory");
+            }
+        }
+        None => println!("Expecting a valid path as argument."),
+    }
+}
 
 pub fn _echo(args_string: Option<String>) {
     if !args_string.is_none() {
@@ -21,7 +39,7 @@ pub fn _pwd() {
 }
 
 pub fn _type(args_string: Option<String>) {
-    let commands: [&str; 4] = ["echo", "type", "exit", "pwd"];
+    let commands: [&str; 5] = ["cd", "echo", "exit", "pwd", "type"];
 
     if !args_string.is_none() {
         let arg = args_string.unwrap();
