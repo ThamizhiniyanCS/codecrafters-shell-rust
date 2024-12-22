@@ -8,12 +8,12 @@ pub fn _cd(args_string: Option<String>) {
         Some(args) => {
             let path = Path::new(&args);
 
-            if path.is_dir() {
-                if path.is_absolute() {
-                    env::set_current_dir(path).unwrap();
-                }
-            } else {
-                println!("cd: {args}: No such file or directory");
+            match path.is_dir() {
+                true => match path.is_absolute() {
+                    true => env::set_current_dir(path).unwrap(),
+                    false => env::set_current_dir(path.canonicalize().unwrap()).unwrap(),
+                },
+                false => println!("cd: {args}: No such file or directory"),
             }
         }
         None => println!("Expecting a valid path as argument."),
@@ -21,16 +21,16 @@ pub fn _cd(args_string: Option<String>) {
 }
 
 pub fn _echo(args_string: Option<String>) {
-    if !args_string.is_none() {
-        println!("{}", args_string.unwrap());
+    match args_string {
+        Some(args) => println!("{}", args),
+        None => println!(),
     }
 }
 
 pub fn _exit(args_string: Option<String>) {
-    if args_string.is_none() {
-        exit(0)
-    } else {
-        exit(args_string.unwrap().parse::<i32>().unwrap());
+    match args_string {
+        Some(args) => exit(args.parse::<i32>().unwrap()),
+        None => exit(0),
     }
 }
 
@@ -41,19 +41,18 @@ pub fn _pwd() {
 pub fn _type(args_string: Option<String>) {
     let commands: [&str; 5] = ["cd", "echo", "exit", "pwd", "type"];
 
-    if !args_string.is_none() {
-        let arg = args_string.unwrap();
+    match args_string {
+        Some(arg) => match commands.contains(&arg.as_str()) {
+            true => println!("{} is a shell builtin", arg),
+            false => {
+                let result: Option<String> = utils::is_valid_executable_env_path(&arg);
 
-        if commands.contains(&arg.as_str()) {
-            println!("{} is a shell builtin", arg);
-        } else {
-            let result: Option<String> = utils::is_valid_executable_env_path(&arg);
-
-            if result.is_none() {
-                println!("{}: not found", arg);
-            } else {
-                println!("{} is {}", arg, result.unwrap());
+                match result {
+                    Some(res) => println!("{} is {}", arg, res),
+                    None => println!("{}: not found", arg),
+                }
             }
-        }
+        },
+        None => println!("Expected a valid command as argument."),
     }
 }
