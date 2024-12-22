@@ -1,59 +1,12 @@
 use regex::Regex;
-use std::env;
-#[allow(unused_imports)]
 use std::io::{self, Write};
-use std::path::Path;
-use std::process::{exit, Command};
+use std::process::Command;
 
-fn is_valid_executable_env_path(env_var_path: &String, command: &str) -> Option<String> {
-    for p in env_var_path.split(":") {
-        let path_string = format!("{p}/{command}").to_string();
-        let path = Path::new(&path_string);
+mod builtins;
+mod utils;
 
-        if path.is_file() {
-            return Some(path_string);
-        }
-    }
-
-    None
-}
-
-fn custom_echo(args_string: Option<String>) {
-    if !args_string.is_none() {
-        println!("{}", args_string.unwrap());
-    }
-}
-
-fn custom_type(env_var_path: &String, args_string: Option<String>) {
-    let commands: [&str; 3] = ["echo", "type", "exit"];
-
-    if !args_string.is_none() {
-        let arg = args_string.unwrap();
-
-        if commands.contains(&arg.as_str()) {
-            println!("{} is a shell builtin", arg);
-        } else {
-            let result: Option<String> = is_valid_executable_env_path(env_var_path, &arg);
-
-            if result.is_none() {
-                println!("{}: not found", arg);
-            } else {
-                println!("{} is {}", arg, result.unwrap());
-            }
-        }
-    }
-}
-
-fn custom_exit(args_string: Option<String>) {
-    if args_string.is_none() {
-        exit(0)
-    } else {
-        exit(args_string.unwrap().parse::<i32>().unwrap());
-    }
-}
-
-fn execute(env_var_path: &String, cmd: &str, args_string: Option<String>) {
-    let result: Option<String> = is_valid_executable_env_path(env_var_path, &cmd);
+fn execute(cmd: &str, args_string: Option<String>) {
+    let result: Option<String> = utils::is_valid_executable_env_path(&cmd);
 
     if result.is_none() {
         println!("{}: command not found", cmd);
@@ -75,7 +28,6 @@ fn execute(env_var_path: &String, cmd: &str, args_string: Option<String>) {
 }
 
 fn main() {
-    let env_var_path = env::var("PATH").unwrap();
     let regex_command_pattern: Regex = Regex::new(r"^(\w+)(?:\s(.+))?$").unwrap();
 
     loop {
@@ -113,10 +65,11 @@ fn main() {
 
         if !command.is_none() {
             match command.unwrap() {
-                "echo" => custom_echo(args_string),
-                "type" => custom_type(&env_var_path, args_string),
-                "exit" => custom_exit(args_string),
-                _ => execute(&env_var_path, command.unwrap(), args_string),
+                "echo" => builtins::_echo(args_string),
+                "exit" => builtins::_exit(args_string),
+                "pwd" => builtins::_pwd(),
+                "type" => builtins::_type(args_string),
+                _ => execute(command.unwrap(), args_string),
             }
         }
     }
