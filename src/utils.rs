@@ -17,6 +17,12 @@ pub fn is_valid_executable_env_path(command: &str) -> Option<String> {
     None
 }
 
+fn is_multiple_arguments(args_string: &String) -> bool {
+    let regex_pattern: Regex = Regex::new(r#"(?:(?:\s")|(?:"\s))"#).unwrap();
+
+    regex_pattern.is_match(&args_string)
+}
+
 fn is_separate_argument(
     m: regex::Match<'_>,
     characters: &Vec<char>,
@@ -44,9 +50,12 @@ fn is_separate_argument(
 pub fn process_args(args_string: &String) -> Vec<String> {
     let regex_expressions = [
         // Capture strings within Single quotes
-        r#""([^"]*)""#,
+        r#"('[^']*')"#,
         // Capture strings within Double quotes
-        r#"'([^']*)'"#,
+        match is_multiple_arguments(args_string) {
+            true => r#"((?:".*?")+)"#,
+            false => r#"(".*")"#,
+        },
         // Capture normal strings
         r#"(\w+)"#,
         // Capture normal and path strings without quotes and with backslashes
@@ -75,17 +84,38 @@ pub fn process_args(args_string: &String) -> Vec<String> {
             // Capture strings within Single quotes
             0 => {
                 for capture in regexes[0].captures_iter(&args_string) {
-                    let m = capture.get(1).unwrap().as_str().to_string();
-
-                    results.push(m)
+                    match is_separate_argument(capture.get(1).unwrap(), &characters, characters_len)
+                    {
+                        Some(res) => {
+                            results.push(
+                                res.strip_prefix('\'')
+                                    .and_then(|s| s.strip_suffix('\''))
+                                    .unwrap_or(&res)
+                                    .to_string(),
+                            );
+                        }
+                        None => (),
+                    }
                 }
             }
             // Capture strings within Double quotes
             1 => {
                 for capture in regexes[1].captures_iter(&args_string) {
-                    let m = capture.get(1).unwrap().as_str().to_string();
-
-                    results.push(m)
+                    match is_separate_argument(capture.get(1).unwrap(), &characters, characters_len)
+                    {
+                        Some(res) => {
+                            results.push(
+                                res.strip_prefix('"')
+                                    .and_then(|s| s.strip_suffix('"'))
+                                    .unwrap_or(&res)
+                                    .replace("\\\\", "\\")
+                                    .replace("\\$", "$")
+                                    .replace("\\\"", "\"")
+                                    .replace("\\\n", "\n"),
+                            );
+                        }
+                        None => (),
+                    }
                 }
             }
             // Capture normal strings
