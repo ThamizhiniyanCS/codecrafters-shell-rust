@@ -5,7 +5,7 @@ use std::process::Command;
 mod builtins;
 mod utils;
 
-fn execute(cmd: &str, args_string: Option<Vec<String>>) {
+fn execute(cmd: &str, args_string: Option<Vec<(usize, String)>>) {
     let result: Option<String> = utils::is_valid_executable_env_path(&cmd);
 
     if result.is_none() {
@@ -13,7 +13,7 @@ fn execute(cmd: &str, args_string: Option<Vec<String>>) {
     } else {
         let output = match args_string {
             Some(args) => Command::new(cmd)
-                .args(args)
+                .args(args.iter().map(|arg| arg.1.clone()))
                 .output()
                 .expect("Failed to execute process."),
             None => Command::new(cmd)
@@ -63,7 +63,7 @@ fn main() {
             };
         }
 
-        let processed_args: Option<Vec<String>> = match args_string {
+        let processed_args: Option<Vec<(usize, String)>> = match args_string {
             Some(args_str) => Some(utils::process_args(&args_str)),
             None => None,
         };

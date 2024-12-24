@@ -17,12 +17,6 @@ pub fn is_valid_executable_env_path(command: &str) -> Option<String> {
     None
 }
 
-fn is_multiple_arguments(args_string: &String) -> bool {
-    let regex_pattern: Regex = Regex::new(r#"(?:(?:\s")|(?:"\s))"#).unwrap();
-
-    regex_pattern.is_match(&args_string)
-}
-
 fn is_separate_argument(
     m: regex::Match<'_>,
     characters: &Vec<char>,
@@ -47,13 +41,18 @@ fn is_separate_argument(
     }
 }
 
-pub fn process_args(args_string: &String) -> Vec<String> {
+pub fn process_args(args_string: &String) -> Vec<(usize, String)> {
+    let is_multiple_arguments_regex_pattern: Regex =
+        Regex::new(r#"(?:(?:\s["'])|(?:["']\s))"#).unwrap();
+    let escape_backslash_inside_double_quotes_regex_pattern: Regex =
+        Regex::new(r#"(\\\$|\\"|\\\\n|\\\\|")"#).unwrap();
+
     let regex_expressions = [
         // Capture strings within Single quotes
         r#"('[^']*')"#,
         // Capture strings within Double quotes
-        match is_multiple_arguments(args_string) {
-            true => r#"((?:".*?")+)"#,
+        match is_multiple_arguments_regex_pattern.is_match(&args_string) {
+            true => r#"((?:".*?")+|(?:".*')+)"#,
             false => r#"(".*")"#,
         },
         // Capture normal strings
@@ -67,9 +66,10 @@ pub fn process_args(args_string: &String) -> Vec<String> {
         // Capture ., ~ and /
         r#"(\.|/|~)"#,
     ];
+
     let characters: Vec<char> = args_string.chars().collect();
     let characters_len: usize = characters.len();
-    let mut results: Vec<String> = Vec::new();
+    let mut results: Vec<(usize, String)> = Vec::new();
 
     let regex_set = RegexSet::new(regex_expressions).unwrap();
 
@@ -87,12 +87,9 @@ pub fn process_args(args_string: &String) -> Vec<String> {
                     match is_separate_argument(capture.get(1).unwrap(), &characters, characters_len)
                     {
                         Some(res) => {
-                            results.push(
-                                res.strip_prefix('\'')
-                                    .and_then(|s| s.strip_suffix('\''))
-                                    .unwrap_or(&res)
-                                    .to_string(),
-                            );
+                            let temp = &res[1..res.len() - 1].to_string();
+
+                            results.push((0, temp.clone()));
                         }
                         None => (),
                     }
@@ -104,15 +101,48 @@ pub fn process_args(args_string: &String) -> Vec<String> {
                     match is_separate_argument(capture.get(1).unwrap(), &characters, characters_len)
                     {
                         Some(res) => {
-                            results.push(
-                                res.strip_prefix('"')
-                                    .and_then(|s| s.strip_suffix('"'))
-                                    .unwrap_or(&res)
-                                    .replace("\\\\", "\\")
-                                    .replace("\\$", "$")
-                                    .replace("\\\"", "\"")
-                                    .replace("\\\n", "\n"),
-                            );
+                            let mut temp: Vec<Option<char>> =
+                                res.chars().map(|char| Some(char)).collect();
+
+                            for capture in escape_backslash_inside_double_quotes_regex_pattern
+                                .captures_iter(&res)
+                            {
+                                let m = capture.get(1).unwrap();
+                                match m.as_str() {
+                                    "\\\\" => {
+                                        temp[m.start()] = Some('\\');
+                                        temp[m.end() - 1] = None;
+                                    }
+                                    "\\$" => {
+                                        temp[m.start()] = Some('$');
+                                        temp[m.end() - 1] = None;
+                                    }
+                                    "\\\"" => {
+                                        temp[m.start()] = Some('\"');
+                                        temp[m.end() - 1] = None;
+                                    }
+                                    "\\\\n" => {
+                                        temp[m.start()] = Some('\\');
+                                        temp[m.start() + 1] = Some('n');
+                                        temp[m.end() - 1] = None;
+                                    }
+                                    "\"" => {
+                                        temp[m.start()] = None;
+                                    }
+                                    _ => (),
+                                }
+                            }
+
+                            let mut final_string: String = String::new();
+
+                            for opt in temp {
+                                match opt {
+                                    Some(c) => final_string.push(c),
+                                    None => (),
+                                }
+                            }
+
+                            results.push((1, final_string));
                         }
                         None => (),
                     }
@@ -123,7 +153,7 @@ pub fn process_args(args_string: &String) -> Vec<String> {
                 for capture in regexes[2].captures_iter(&args_string) {
                     match is_separate_argument(capture.get(1).unwrap(), &characters, characters_len)
                     {
-                        Some(res) => results.push(res),
+                        Some(res) => results.push((2, res)),
                         None => (),
                     }
                 }
@@ -140,7 +170,7 @@ pub fn process_args(args_string: &String) -> Vec<String> {
                                 temp = temp.replace('\\', "");
                             };
 
-                            results.push(temp);
+                            results.push((3, temp));
                         }
                         None => (),
                     }
@@ -153,7 +183,7 @@ pub fn process_args(args_string: &String) -> Vec<String> {
                     {
                         Some(res) => {
                             if res.contains("/") {
-                                results.push(res)
+                                results.push((4, res))
                             }
                         }
                         None => (),
@@ -165,7 +195,7 @@ pub fn process_args(args_string: &String) -> Vec<String> {
                 for capture in regexes[5].captures_iter(&args_string) {
                     match is_separate_argument(capture.get(1).unwrap(), &characters, characters_len)
                     {
-                        Some(res) => results.push(res),
+                        Some(res) => results.push((5, res)),
                         None => (),
                     }
                 }
@@ -175,7 +205,7 @@ pub fn process_args(args_string: &String) -> Vec<String> {
                 for capture in regexes[6].captures_iter(&args_string) {
                     match is_separate_argument(capture.get(1).unwrap(), &characters, characters_len)
                     {
-                        Some(res) => results.push(res),
+                        Some(res) => results.push((6, res)),
                         None => (),
                     }
                 }
@@ -185,7 +215,7 @@ pub fn process_args(args_string: &String) -> Vec<String> {
     }
 
     if results.is_empty() {
-        results.push(args_string.to_string())
+        results.push((010, args_string.to_string()))
     }
 
     results
