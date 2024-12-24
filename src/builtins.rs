@@ -1,6 +1,6 @@
 use crate::utils;
 use std::env;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::exit;
 
 pub fn _cd(args_string: Option<Vec<(usize, String)>>) {
@@ -61,10 +61,11 @@ pub fn _type(args_string: Option<Vec<(usize, String)>>) {
                 match commands.contains(&arg.1.as_str()) {
                     true => println!("{} is a shell builtin", arg.1),
                     false => {
-                        let result: Option<String> = utils::is_valid_executable_env_path(&arg.1);
+                        let result: Option<PathBuf> =
+                            utils::is_valid_executable_in_env_path(&arg.1);
 
                         match result {
-                            Some(res) => println!("{} is {}", arg.1, res),
+                            Some(res) => println!("{} is {}", arg.1, res.display()),
                             None => println!("{}: not found", arg.1),
                         }
                     }

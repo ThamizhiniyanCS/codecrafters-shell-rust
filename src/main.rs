@@ -1,35 +1,22 @@
 use regex::Regex;
 use std::io::{self, Write};
-use std::process::Command;
+use std::sync::LazyLock;
 
 mod builtins;
 mod utils;
 
-fn execute(cmd: &str, args_string: Option<Vec<(usize, String)>>) {
-    let result: Option<String> = utils::is_valid_executable_env_path(&cmd);
-
-    if result.is_none() {
-        println!("{}: command not found", cmd);
-    } else {
-        let output = match args_string {
-            Some(args) => Command::new(cmd)
-                .args(args.iter().map(|arg| arg.1.clone()))
-                .output()
-                .expect("Failed to execute process."),
-            None => Command::new(cmd)
-                .output()
-                .expect("Failed to execute process."),
-        };
-
-        let stdout = String::from_utf8(output.stdout).expect("Invalid utf-8 in process output");
-
-        println!("{}", stdout.trim());
-    }
-}
+pub static REGEX_COMMAND_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"^((?:.*?/)?'.+'|".+"|\w+)(?:\s(.+))?$"#).unwrap());
+pub static IS_MULTIPLE_ARGUMENTS_REGEX_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"(?:(?:\s["'])|(?:["']\s))"#).unwrap());
+pub static ESCAPE_BACKSLASH_INSIDE_DOUBLE_QUOTES_REGEX_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"(\\\$|\\"|\\\\n|\\\\|")"#).unwrap());
+pub static ENCLOSED_SINGLE_QUOTES_REGEX_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"('[^']*')"#).unwrap());
+pub static ENCLOSED_DOUBLE_QUOTES_REGEX_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"(".*")"#).unwrap());
 
 fn main() {
-    let regex_command_pattern: Regex = Regex::new(r"^(\w+)(?:\s(.+))?$").unwrap();
-
     loop {
         print!("$ ");
         io::stdout().flush().unwrap();
@@ -42,12 +29,14 @@ fn main() {
         let trimmed_input = input.trim().to_string();
 
         let command_captures: Option<regex::Captures<'_>> =
-            regex_command_pattern.captures(&trimmed_input);
+            REGEX_COMMAND_PATTERN.captures(&trimmed_input);
 
         let mut command: Option<&str> = Some("");
         let mut args_string: Option<String> = Some(String::new());
 
-        if !command_captures.is_none() {
+        if command_captures.is_none() {
+            continue;
+        } else {
             let capture = command_captures.unwrap();
 
             command = if capture.get(1).is_none() {
@@ -64,7 +53,7 @@ fn main() {
         }
 
         let processed_args: Option<Vec<(usize, String)>> = match args_string {
-            Some(args_str) => Some(utils::process_args(&args_str)),
+            Some(args_str) => Some(utils::parse_args(&args_str)),
             None => None,
         };
 
@@ -75,7 +64,7 @@ fn main() {
                 "exit" => builtins::_exit(processed_args),
                 "pwd" => builtins::_pwd(),
                 "type" => builtins::_type(processed_args),
-                _ => execute(command.unwrap(), processed_args),
+                _ => utils::execute(command.unwrap(), processed_args),
             }
         }
     }

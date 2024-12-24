@@ -1,20 +1,69 @@
 use regex::{Regex, RegexSet};
 use std::env;
-use std::path::Path;
+use std::io::{self, Write};
+use std::os::unix::fs::PermissionsExt;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 
-pub fn is_valid_executable_env_path(command: &str) -> Option<String> {
-    let env_var_path = env::var("PATH").unwrap();
+fn is_valid_executable(path: &Path) -> bool {
+    match path.metadata() {
+        Ok(metadata) => {
+            let permissions = metadata.permissions().mode();
+            // Check if the file is executable by owner, group, or others
+            permissions & 0o111 != 0
+        }
+        Err(_) => false,
+    }
+}
 
-    for p in env_var_path.split(":") {
-        let path_string = format!("{p}/{command}").to_string();
-        let path = Path::new(&path_string);
+pub fn is_valid_executable_in_env_path(command: &str) -> Option<PathBuf> {
+    let env_path = env::var("PATH").unwrap_or_default();
 
-        if path.is_file() {
-            return Some(path_string);
+    for dir in env_path.split(':') {
+        let abs_path = Path::new(dir).join(command);
+
+        if abs_path.is_file() && is_valid_executable(&abs_path) {
+            return Some(abs_path);
+        }
+
+        // Also check the trimmed version
+        let trimmed_command = command[1..command.len() - 1].to_string();
+
+        if trimmed_command != command {
+            let abs_trimmed_path = Path::new(dir).join(trimmed_command);
+            if abs_trimmed_path.is_file() && is_valid_executable(&abs_trimmed_path) {
+                return Some(abs_trimmed_path);
+            }
         }
     }
 
     None
+}
+
+pub fn execute(cmd: &str, args: Option<Vec<(usize, String)>>) {
+    if let Some(executable_path) = is_valid_executable_in_env_path(cmd) {
+        let argument_list: Vec<String> = args
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(_, arg)| arg) // Extract the String from the tuple
+            .collect();
+
+        let output = Command::new(executable_path).args(argument_list).output();
+
+        match output {
+            Ok(output) if output.status.success() => {
+                io::stdout().write_all(&output.stdout).unwrap();
+            }
+            Ok(output) => {
+                io::stderr().write_all(&output.stderr).unwrap();
+            }
+            Err(e) => {
+                eprintln!("Failed to execute {}: {}", cmd, e);
+            }
+        }
+    } else {
+        eprintln!("{}: command not found", cmd);
+    }
 }
 
 fn is_separate_argument(
@@ -41,17 +90,12 @@ fn is_separate_argument(
     }
 }
 
-pub fn process_args(args_string: &String) -> Vec<(usize, String)> {
-    let is_multiple_arguments_regex_pattern: Regex =
-        Regex::new(r#"(?:(?:\s["'])|(?:["']\s))"#).unwrap();
-    let escape_backslash_inside_double_quotes_regex_pattern: Regex =
-        Regex::new(r#"(\\\$|\\"|\\\\n|\\\\|")"#).unwrap();
-
+pub fn parse_args(args_string: &String) -> Vec<(usize, String)> {
     let regex_expressions = [
         // Capture strings within Single quotes
         r#"('[^']*')"#,
         // Capture strings within Double quotes
-        match is_multiple_arguments_regex_pattern.is_match(&args_string) {
+        match crate::IS_MULTIPLE_ARGUMENTS_REGEX_PATTERN.is_match(&args_string) {
             true => r#"((?:".*?")+|(?:".*')+)"#,
             false => r#"(".*")"#,
         },
@@ -104,8 +148,9 @@ pub fn process_args(args_string: &String) -> Vec<(usize, String)> {
                             let mut temp: Vec<Option<char>> =
                                 res.chars().map(|char| Some(char)).collect();
 
-                            for capture in escape_backslash_inside_double_quotes_regex_pattern
-                                .captures_iter(&res)
+                            for capture in
+                                crate::ESCAPE_BACKSLASH_INSIDE_DOUBLE_QUOTES_REGEX_PATTERN
+                                    .captures_iter(&res)
                             {
                                 let m = capture.get(1).unwrap();
                                 match m.as_str() {
